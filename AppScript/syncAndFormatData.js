@@ -1,12 +1,13 @@
 function syncAndFormatData() {
-  var SOURCE_SPREADSHEET_ID = "你的來源試算表 ID";  // ⚠️ 請填入來源試算表 ID
-  var SOURCE_SHEET_NAME = "原始資料";  // ⚠️ 來源工作表名稱
+  var SOURCE_SPREADSHEET_ID = "你的來源試算表 ID"; // ⚠️ 請填入來源試算表 ID
+  var SOURCE_SHEET_NAME = "原始資料"; // ⚠️ 來源工作表名稱
   var TARGET_SHEET_NAME = "整理後資料"; // ⚠️ 目標工作表名稱
 
   // 取得來源試算表與來源工作表
   var sourceSpreadsheet = SpreadsheetApp.openById(SOURCE_SPREADSHEET_ID);
   var sourceSheet = sourceSpreadsheet.getSheetByName(SOURCE_SHEET_NAME);
-  var targetSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TARGET_SHEET_NAME);
+  var targetSheet =
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TARGET_SHEET_NAME);
 
   if (!sourceSheet || !targetSheet) {
     Logger.log("❌ 找不到工作表，請確認名稱是否正確");
@@ -33,8 +34,10 @@ function syncAndFormatData() {
   });
 
   // **刪除 `row 1` 指定欄位**
-  data.forEach(row => {
-    removeIndexes.sort((a, b) => b - a).forEach(index => row.splice(index, 1));
+  data.forEach((row) => {
+    removeIndexes
+      .sort((a, b) => b - a)
+      .forEach((index) => row.splice(index, 1));
   });
 
   // **刪除 `row 1`**
@@ -54,22 +57,30 @@ function syncAndFormatData() {
   });
 
   // **刪除 `參與日期` 和 `報名者`**
-  finalRemoveIndexes.sort((a, b) => b - a).forEach(index => {
-    headers.splice(index, 1);
-    data.forEach(row => row.splice(index, 1));
-  });
+  finalRemoveIndexes
+    .sort((a, b) => b - a)
+    .forEach((index) => {
+      headers.splice(index, 1);
+      data.forEach((row) => row.splice(index, 1));
+    });
 
-  Logger.log("📌 刪除 `參與日期` & `報名者` 後的標題: " + JSON.stringify(headers));
+  Logger.log(
+    "📌 刪除 `參與日期` & `報名者` 後的標題: " + JSON.stringify(headers)
+  );
 
   // **步驟 5: 重新計算 `身份` & `慈濟志工身份別` 的索引**
   var identityIndex = headers.indexOf("身份");
   var volunteerIdentityIndex = headers.indexOf("慈濟志工身份別");
-  
 
-  Logger.log("👤 身份索引: " + identityIndex + " / 慈濟志工身份別索引: " + volunteerIdentityIndex);
+  Logger.log(
+    "👤 身份索引: " +
+      identityIndex +
+      " / 慈濟志工身份別索引: " +
+      volunteerIdentityIndex
+  );
 
   // **步驟 6: 合併 `身份` 資料**
-  data.forEach(row => {
+  data.forEach((row) => {
     if (row[identityIndex] === "慈濟志工" && row[volunteerIdentityIndex]) {
       row[identityIndex] = row[volunteerIdentityIndex]; // 替換為慈濟志工身份別
     }
@@ -77,14 +88,17 @@ function syncAndFormatData() {
 
   // **步驟 7: 刪除 `慈濟志工身份別` 欄位**
   headers.splice(volunteerIdentityIndex, 1);
-  data.forEach(row => row.splice(volunteerIdentityIndex, 1));
+  data.forEach((row) => row.splice(volunteerIdentityIndex, 1));
 
   Logger.log("📌 刪除 `慈濟志工身份別` 後的標題: " + JSON.stringify(headers));
 
   // **步驟 8: 修正 `交通方式` 欄位名稱**
-  headers = headers.map(header => {
-    if (header.match(/^\d{1,2}\/\d{2}(\S+)交通方式/)) {
-      return header.match(/^\d{1,2}\/\d{2}/)[0]; // 只保留日期部分
+  headers = headers.map((header) => {
+    const match = header.match(/^(\d{1,2})\/(\d{1,2})\S*交通方式/);
+    if (match) {
+      const month = String(match[1]).padStart(2, "0"); // 補零確保兩位數
+      const day = String(match[2]).padStart(2, "0"); // 補零確保兩位數
+      return month + day;
     }
     return header;
   });
@@ -94,7 +108,7 @@ function syncAndFormatData() {
   Logger.log("📞 聯絡電話索引: " + phoneIndex);
 
   // **步驟 9: 處理 `聯絡電話`**
-  data = data.map(row => {
+  data = data.map((row) => {
     return row.map((cell, index) => {
       // **處理電話格式**
       if (index === phoneIndex) {
@@ -103,7 +117,8 @@ function syncAndFormatData() {
         }
         if (typeof cell === "string") {
           cell = cell.trim();
-          if (/^9\d{8}$/.test(cell)) {  // 9 開頭 + 9 碼
+          if (/^9\d{8}$/.test(cell)) {
+            // 9 開頭 + 9 碼
             cell = `0${cell.slice(0, 4)}-${cell.slice(4)}`;
           } else {
             cell = "電話錯誤";
@@ -127,7 +142,9 @@ function syncAndFormatData() {
   Logger.log("✅ 處理後的新數據前 5 行: " + JSON.stringify(data.slice(0, 5)));
 
   // **步驟 10: 確保標題的長度與數據對齊**
-  Logger.log("⚡ 新標題長度: " + headers.length + " / 新數據欄位數: " + data[0].length);
+  Logger.log(
+    "⚡ 新標題長度: " + headers.length + " / 新數據欄位數: " + data[0].length
+  );
 
   // **步驟 11: 清空目標表單，寫入新標題和整理後的資料**
   targetSheet.clear();
