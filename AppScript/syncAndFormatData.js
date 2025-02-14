@@ -26,44 +26,37 @@ function syncAndFormatData() {
   // **步驟 2: 移除 row 1 的 `SUBMIT_TIME` 和 `POST_HASH`**
   var headersRow1 = data[0];
   var removeIndexes = [];
-
   headersRow1.forEach((header, index) => {
-    if (header === "SUBMIT_TIME" || header === "POST_HASH") {
+    if (header === "SUBMIT_TIME" || header === "POST_HASH" || header === 112) {
       removeIndexes.push(index);
     }
   });
-
-  // **刪除 `row 1` 指定欄位**
+  // 刪除 row 1 指定欄位
   data.forEach((row) => {
     removeIndexes
       .sort((a, b) => b - a)
       .forEach((index) => row.splice(index, 1));
   });
-
-  // **刪除 `row 1`**
+  // **刪除 row 1**
   data.shift();
 
   // **步驟 3: 記錄 row 2 作為標題**
   var headers = data.shift();
   Logger.log("📌 新標題 (Row 2): " + JSON.stringify(headers));
 
-  // **步驟 4: 先刪除 `參與日期` & `報名者`**
+  // **步驟 4: 刪除 `參與日期` & `報名者` 欄位**
   var finalRemoveIndexes = [];
-
   headers.forEach((header, index) => {
     if (header === "參與日期" || header === "報名者") {
       finalRemoveIndexes.push(index);
     }
   });
-
-  // **刪除 `參與日期` 和 `報名者`**
   finalRemoveIndexes
     .sort((a, b) => b - a)
     .forEach((index) => {
       headers.splice(index, 1);
       data.forEach((row) => row.splice(index, 1));
     });
-
   Logger.log(
     "📌 刪除 `參與日期` & `報名者` 後的標題: " + JSON.stringify(headers)
   );
@@ -71,7 +64,6 @@ function syncAndFormatData() {
   // **步驟 5: 重新計算 `身份` & `慈濟志工身份別` 的索引**
   var identityIndex = headers.indexOf("身份");
   var volunteerIdentityIndex = headers.indexOf("慈濟志工身份別");
-
   Logger.log(
     "👤 身份索引: " +
       identityIndex +
@@ -89,16 +81,15 @@ function syncAndFormatData() {
   // **步驟 7: 刪除 `慈濟志工身份別` 欄位**
   headers.splice(volunteerIdentityIndex, 1);
   data.forEach((row) => row.splice(volunteerIdentityIndex, 1));
-
   Logger.log("📌 刪除 `慈濟志工身份別` 後的標題: " + JSON.stringify(headers));
 
   // **步驟 8: 修正 `交通方式` 欄位名稱**
   headers = headers.map((header) => {
     const match = header.match(/^(\d{1,2})\/(\d{1,2})\S*交通方式/);
     if (match) {
-      const month = String(match[1]).padStart(2, "0"); // 補零確保兩位數
-      const day = String(match[2]).padStart(2, "0"); // 補零確保兩位數
-      return month + day;
+      const month = match[1].padStart(2, "0");
+      const day = match[2].padStart(2, "0");
+      return `${month}${day}`;
     }
     return header;
   });
@@ -107,19 +98,19 @@ function syncAndFormatData() {
   var phoneIndex = headers.indexOf("聯絡電話");
   Logger.log("📞 聯絡電話索引: " + phoneIndex);
 
-  // **步驟 9: 處理 `聯絡電話`**
+  // **步驟 9: 處理 `聯絡電話` 與 `交通方式` 欄位內容**
   data = data.map((row) => {
     return row.map((cell, index) => {
-      // **處理電話格式**
+      // 處理電話格式
       if (index === phoneIndex) {
         if (typeof cell === "number") {
-          cell = cell.toString(); // 轉換成字串
+          cell = cell.toString();
         }
         if (typeof cell === "string") {
           cell = cell.trim();
           if (/^9\d{8}$/.test(cell)) {
             // 9 開頭 + 9 碼
-            cell = `0${cell.slice(0, 4)}-${cell.slice(4)}`;
+            cell = `0${cell.slice(0, 3)}-${cell.slice(3)}`;
           } else {
             cell = "電話錯誤";
           }
@@ -127,8 +118,7 @@ function syncAndFormatData() {
           cell = "電話錯誤";
         }
       }
-
-      // **處理 `交通方式`**
+      // 處理交通方式：移除前面日期等描述，僅保留方式
       if (typeof cell === "string") {
         cell = cell.replace(/^\d{1,2}\/\d{2}\S+／/, "").trim();
         if (cell === "自行前往曾文青年活動中心") {
@@ -140,16 +130,126 @@ function syncAndFormatData() {
   });
 
   Logger.log("✅ 處理後的新數據前 5 行: " + JSON.stringify(data.slice(0, 5)));
-
-  // **步驟 10: 確保標題的長度與數據對齊**
   Logger.log(
     "⚡ 新標題長度: " + headers.length + " / 新數據欄位數: " + data[0].length
   );
 
-  // **步驟 11: 清空目標表單，寫入新標題和整理後的資料**
+  // **步驟 10: 清空目標表單，寫入新標題和整理後的資料 (同步工作表)**
   targetSheet.clear();
-  targetSheet.getRange(1, 1, 1, headers.length).setValues([headers]); // 設定標題
-  targetSheet.getRange(2, 1, data.length, headers.length).setValues(data); // 設定資料
+  targetSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  targetSheet.getRange(2, 1, data.length, headers.length).setValues(data);
+  Logger.log("🚀 同步工作表資料整理完成");
 
-  Logger.log("🚀 整理完成，資料已同步至目標表單");
+  // ************** 以下為新增功能 **************
+  // 產生「志工名單」工作表 (包含志工的各欄位及ID)
+  // ※ 依據聯絡電話作唯一比對
+  var phoneToID = generateUniqueUserSheet(headers, data);
+
+  // 產生「交通方式」工作表 (長格式：每筆報名資料依日期拆解，並加入志工ID)
+  generateTransportSheet(headers, data, phoneToID);
+}
+
+// 產生唯一志工名單 (包含欄位：姓名、性別、聯絡電話、聯絡 E-mail、年齡、身份、區別) 及自動增量 ID
+function generateUniqueUserSheet(headers, data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = "志工名單";
+  var userSheet = ss.getSheetByName(sheetName);
+  if (!userSheet) {
+    userSheet = ss.insertSheet(sheetName);
+  } else {
+    userSheet.clear();
+  }
+
+  // 定義志工名單需包含的欄位（不含 0213~0216 交通方式欄位）
+  var volunteerFields = [
+    "姓名",
+    "性別",
+    "聯絡電話",
+    "聯絡 E-mail",
+    "年齡",
+    "身份",
+    "區別",
+  ];
+
+  // 取得各欄位在 headers 中的索引
+  var indices = {};
+  volunteerFields.forEach(function (field) {
+    indices[field] = headers.indexOf(field);
+  });
+
+  // 以聯絡電話作為唯一 key (注意：需確保資料在清整後格式一致)
+  var phoneIndex = indices["聯絡電話"];
+  var uniqueUsers = {}; // phone -> ID
+  var userList = [];
+  var idCounter = 1;
+
+  data.forEach(function (row) {
+    var phone = row[phoneIndex];
+    if (!uniqueUsers.hasOwnProperty(phone)) {
+      uniqueUsers[phone] = idCounter;
+      var volunteerRow = [idCounter]; // 第一欄放 ID
+      // 加入 volunteerFields 各欄位的資料
+      volunteerFields.forEach(function (field) {
+        volunteerRow.push(row[indices[field]]);
+      });
+      userList.push(volunteerRow);
+      idCounter++;
+    }
+  });
+
+  // 設定志工名單的標題：ID 加上志工Fields
+  var userHeaders = ["ID"].concat(volunteerFields);
+  userList.unshift(userHeaders);
+
+  userSheet
+    .getRange(1, 1, userList.length, userHeaders.length)
+    .setValues(userList);
+  Logger.log("✅ 志工名單產生完成");
+
+  // 回傳以聯絡電話為 key 的 ID 對應表 (用於交通方式表建立 ref)
+  return uniqueUsers;
+}
+
+// 產生長格式「交通方式」工作表 (每筆資料依日期拆解，並加入對應的志工ID)
+function generateTransportSheet(headers, data, phoneToID) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = "交通方式";
+  var transportSheet = ss.getSheetByName(sheetName);
+  if (!transportSheet) {
+    transportSheet = ss.insertSheet(sheetName);
+  } else {
+    transportSheet.clear();
+  }
+
+  // 假設交通方式欄位名稱已修正為 "0213", "0214", "0215", "0216"
+  var dateCols = ["0213", "0214", "0215", "0216"];
+  var dateIndexes = dateCols.map(function (date) {
+    return headers.indexOf(date);
+  });
+
+  // 取得「姓名」及「聯絡電話」欄位索引 (用以取得志工ID)
+  var nameIndex = headers.indexOf("姓名");
+  var phoneIndex = headers.indexOf("聯絡電話");
+
+  // 設定交通方式工作表的標題，增加「志工ID」
+  var transportHeaders = ["志工ID", "姓名", "日期", "交通方式"];
+  var transportData = [transportHeaders];
+
+  data.forEach(function (row) {
+    var name = row[nameIndex];
+    var phone = row[phoneIndex];
+    var volunteerID = phoneToID[phone] || "";
+    dateIndexes.forEach(function (idx, i) {
+      var date = dateCols[i];
+      var transport = row[idx];
+      if (transport && transport !== "") {
+        transportData.push([volunteerID, name, date, transport]);
+      }
+    });
+  });
+
+  transportSheet
+    .getRange(1, 1, transportData.length, transportHeaders.length)
+    .setValues(transportData);
+  Logger.log("✅ 交通方式工作表產生完成");
 }
