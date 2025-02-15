@@ -188,6 +188,7 @@ function generateUniqueUserSheet(headers, data) {
 
 
 // 產生長格式「交通方式」工作表 (每筆資料依日期拆解，並加入對應的志工ID)
+// 調整後：每個志工ID每天只保留一筆交通方式(多筆以最後一筆為主)
 function generateTransportSheet(headers, data, phoneToID) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = "交通方式";
@@ -200,7 +201,7 @@ function generateTransportSheet(headers, data, phoneToID) {
 
   // 假設交通方式欄位名稱已修正為 "0213", "0214", "0215", "0216"
   var dateCols = ["0213", "0214", "0215", "0216"];
-  var dateIndexes = dateCols.map(function (date) {
+  var dateIndexes = dateCols.map(function(date) {
     return headers.indexOf(date);
   });
 
@@ -208,22 +209,33 @@ function generateTransportSheet(headers, data, phoneToID) {
   var nameIndex = headers.indexOf("姓名");
   var phoneIndex = headers.indexOf("聯絡電話");
 
-  // 設定交通方式工作表的標題，增加「青年志工ID」
-  var transportHeaders = ["青年志工ID", "姓名", "日期", "交通方式"];
-  var transportData = [transportHeaders];
+  // 使用物件儲存每個志工每天最後一筆的交通方式
+  // key 格式為 "志工ID_日期"
+  var transportMap = {};
 
-  data.forEach(function (row) {
+  data.forEach(function(row) {
     var name = row[nameIndex];
     var phone = row[phoneIndex];
     var volunteerID = phoneToID[phone] || "";
-    dateIndexes.forEach(function (idx, i) {
+    if (!volunteerID) return; // 若無對應ID則跳過
+    dateIndexes.forEach(function(idx, i) {
       var date = dateCols[i];
       var transport = row[idx];
       if (transport && transport !== "") {
-        transportData.push([volunteerID, name, date, transport]);
+        var key = volunteerID + "_" + date;
+        // 覆蓋同一志工同一天的資料，最後一筆有效
+        transportMap[key] = [volunteerID, name, date, transport];
       }
     });
   });
+
+  // 整理 transportMap 成為陣列
+  var transportData = [];
+  var transportHeaders = ["青年志工ID", "姓名", "日期", "交通方式"];
+  transportData.push(transportHeaders);
+  for (var key in transportMap) {
+    transportData.push(transportMap[key]);
+  }
 
   transportSheet.getRange(1, 1, transportData.length, transportHeaders.length).setValues(transportData);
   Logger.log("✅ 交通方式工作表產生完成");
