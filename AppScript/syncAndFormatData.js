@@ -129,6 +129,13 @@ function syncAndFormatData() {
     });
   });
 
+  // 修改欄位名稱
+  headers = headers.map(header => {
+    if (header === "是否有修繕相關專業") return "修繕專業";
+    if (header === "您如何得知此活動訊息") return "訊息來源";
+    return header;
+  });
+
   Logger.log("✅ 處理後的新數據前 5 行: " + JSON.stringify(data.slice(0, 5)));
   Logger.log(
     "⚡ 新標題長度: " + headers.length + " / 新數據欄位數: " + data[0].length
@@ -172,6 +179,8 @@ function generateUniqueUserSheet(headers, data) {
     "年齡",
     "身份",
     "區別",
+    "修繕專業",
+    "訊息來源",
   ];
 
   // 取得各欄位在 headers 中的索引
