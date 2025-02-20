@@ -189,16 +189,19 @@ function generateUniqueUserSheet(headers, data) {
     indices[field] = headers.indexOf(field);
   });
 
-  // 以聯絡電話作為唯一 key (注意：需確保資料在清整後格式一致)
+  // 以姓名+聯絡電話作為唯一 key
+  var nameIndex = indices["姓名"];
   var phoneIndex = indices["聯絡電話"];
-  var uniqueUsers = {}; // phone -> ID
+  var uniqueUsers = {}; // name+phone -> ID
   var userList = [];
   var idCounter = 1;
 
   data.forEach(function (row) {
+    var name = row[nameIndex];
     var phone = row[phoneIndex];
-    if (!uniqueUsers.hasOwnProperty(phone)) {
-      uniqueUsers[phone] = idCounter;
+    var key = name + phone; // 使用姓名+電話作為唯一key
+    if (!uniqueUsers.hasOwnProperty(key)) {
+      uniqueUsers[key] = idCounter;
       var volunteerRow = [idCounter]; // 第一欄放 ID
       // 加入 volunteerFields 各欄位的資料
       volunteerFields.forEach(function (field) {
@@ -218,7 +221,7 @@ function generateUniqueUserSheet(headers, data) {
     .setValues(userList);
   Logger.log("✅ 志工名單產生完成");
 
-  // 回傳以聯絡電話為 key 的 ID 對應表 (用於交通方式表建立 ref)
+  // 回傳以姓名+聯絡電話為 key 的 ID 對應表 (用於交通方式表建立 ref)
   return uniqueUsers;
 }
 
@@ -262,7 +265,7 @@ function generateTransportSheet(headers, data, phoneToID) {
   data.forEach(function (row) {
     var name = row[nameIndex];
     var phone = row[phoneIndex];
-    var volunteerID = phoneToID[phone] || "";
+    var volunteerID = phoneToID[name + phone] || "";
     if (!volunteerID) return; // 若無對應ID則跳過
     dateIndexes.forEach(function (idx, i) {
       var date = dateCols[i];
@@ -310,7 +313,7 @@ function generateAccommodationSheet(headers, data, phoneToID) {
   data.forEach(function (row) {
     var name = row[nameIndex];
     var phone = row[phoneIndex];
-    var volunteerID = phoneToID[phone] || "";
+    var volunteerID = phoneToID[name + phone] || "";
     if (!volunteerID) return; // 若無對應ID則跳過
     var accommodationDates = row[accommodationIndex];
     if (accommodationDates) {
