@@ -31,7 +31,7 @@ def merge_sheets(file, sheets, header):
     return pd.concat(dfs, ignore_index=True)
 
 
-def clean_address(address, row):
+def clean_dongshi_address(address, row):
     address = str(address)
     if address.startswith("臺南市楠西區東勢里"):
         parts = address.split("鄰")
@@ -41,6 +41,7 @@ def clean_address(address, row):
                 logging.info(f"流水編號: {row['流水編號']}, 鄰: {row['鄰']}, 地址: {address}")
             address = parts[1].strip()
     return address
+
 
 def clean_phone(phone):
     phone = str(phone)
@@ -52,18 +53,34 @@ def clean_phone(phone):
         return phone
 
 
-def main(params):
-    # 合併所有工作表
-    df = merge_sheets(params["file"], params["sheets"], params["header"])
-
+def clean_dongshi(df):
     # 清理 "通報地址(必填)" 欄位
-    df["通報地址(必填)"] = df.apply(lambda row: clean_address(row["通報地址(必填)"], row), axis=1)
+    df["通報地址(必填)"] = df.apply(lambda row: clean_dongshi_address(row["通報地址(必填)"], row), axis=1)
 
     # 清理 "電話" 欄位
     df["電話"] = df["電話"].apply(clean_phone)
 
     # 加上prefix東勢里到流水編號
     df["流水編號"] = "東勢里" + df["流水編號"].astype(str)
+
+    df["通報單位"] = '楠西區公所'
+    return df
+
+
+def clean_yutien(df):
+    return df
+
+
+def main(params):
+    # 合併所有工作表
+    df = merge_sheets(params["file"], params["sheets"], params["header"])
+
+    if params["location"] == "東勢里":
+        df = clean_dongshi(df)
+    elif params["location"] == "玉田里":
+        df = clean_yutien(df)
+    else:
+        raise ValueError("Invalid location")
 
     # 按照鄰排序
     df = df.sort_values(by="鄰")
@@ -79,13 +96,11 @@ def main(params):
     # 檢查 column 是否存在，若不存在則添加
     for column in columns:
         if column not in df.columns:
-            if column in ["會勘進度", "同意書簽署", "通報單位"]:
+            if column in ["會勘進度", "同意書簽署"]:
                 if column == "會勘進度":
                     df[column] = '待勘'
                 elif column == "同意書簽署":
                     df[column] = '否'
-                elif column == "通報單位":
-                    df[column] = '楠西區公所'
             else:
                 df[column] = ''  # 如果 column 不存在，則添加一個空的 column
 
@@ -105,6 +120,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--sheets', nargs='+', required=True, help='工作表名稱，多個工作表請用空格分隔')
     parser.add_argument('-r', '--header', type=int, default=0, help='標題列')
     parser.add_argument('-o', '--output', required=True, help='輸出檔案名稱')
+    parser.add_argument('-l', '--location', required=True, choices=['東勢里', '玉田里'], help='地點')
     args = parser.parse_args()
 
     main(vars(args))
