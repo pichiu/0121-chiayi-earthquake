@@ -44,6 +44,8 @@ def clean_dongshi_address(address, row):
 
 
 def clean_phone(phone):
+    if pd.isnull(phone):
+        return phone
     phone = str(phone)
     if phone.startswith("09") and len(phone) == 10:
         return phone[:4] + "-" + phone[4:]
@@ -51,6 +53,18 @@ def clean_phone(phone):
         return phone[:2] + "-" + phone[2:]
     else:
         return phone
+
+
+def combine_phone(phone, mobile):
+    phone = clean_phone(phone)
+    mobile = clean_phone(mobile)
+    
+    if pd.isnull(phone):
+        return mobile
+    elif pd.isnull(mobile):
+        return phone
+    else:
+        return mobile + "; " + phone
 
 
 def clean_dongshi(df):
@@ -68,6 +82,17 @@ def clean_dongshi(df):
 
 
 def clean_yutien(df):
+    df["通報地址(必填)"] = df["建物住址"]
+    df["聯絡人"] = df["姓名"]
+    df["里"] = df["里別"]
+
+    # 合併電話和手機欄位
+    df["電話"] = df.apply(lambda row: combine_phone(row["電話"], row["手機"]), axis=1)
+
+    df["流水編號"] = "玉田里" + df["序號"].astype(str)
+
+    df["行政區"] = '玉井區'
+    df["通報單位"] = '玉井區公所'
     return df
 
 
@@ -87,7 +112,7 @@ def main(params):
 
     # 重設欄位順序
     columns = [
-        "編號", "負責團隊", "行政區", "里", "鄰", "通報地址 (必填)", "聯絡人", "電話", "毀損情形",
+        "編號", "負責團隊", "行政區", "里", "鄰", "通報地址(必填)", "聯絡人", "電話", "毀損情形",
         "修繕項目", "社福條件", "會勘日期", "會勘進度", "通報日期", "修繕評估", "同意書簽署",
         "施工進度", "開始施工", "竣工日期", "備註", "房屋形式", "產權狀況", "是否需慈濟協助",
         "婉謝原因", "家庭概況", "後續關懷需求", "後續需求情形說明", "通報單位", "流水編號"
@@ -104,7 +129,8 @@ def main(params):
             else:
                 df[column] = ''  # 如果 column 不存在，則添加一個空的 column
 
-    # 調整欄位順序
+    # 重新排序 column
+    df = df[[col for col in df.columns if col in columns]]
     df = df[columns]
 
     # 印出清理後的資料
