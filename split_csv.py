@@ -5,8 +5,12 @@ def filter_address_data(file_path, district_code, village_name, output_path):
     # 讀取CSV檔案
     df = pd.read_csv(file_path, dtype=str)
     
-    # 依據區代碼與里名篩選資料
-    filtered_df = df[(df['鄉鎮市區代碼'] == district_code) & (df['村里'] == village_name)]
+    # 依據區代碼篩選資料
+    filtered_df = df[df['鄉鎮市區代碼'] == district_code]
+    
+    # 如果有指定村里，進一步篩選
+    if village_name:
+        filtered_df = filtered_df[filtered_df['村里'] == village_name]
     
     if filtered_df.empty:
         print("無符合條件的資料")
@@ -21,7 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description='Split CSV file')
     parser.add_argument('-i', '--input_file', required=True, help='輸入CSV檔案路徑')
     parser.add_argument('-d', '--district_code', required=True, help='鄉鎮市區代碼')
-    parser.add_argument('-v', '--village_name', required=True, help='村里名稱')
+    parser.add_argument('-v', '--village_name', help='村里名稱 (可選)')
     parser.add_argument('-o', '--output_file', required=True, help='輸出CSV檔案路徑')
     args = parser.parse_args()
 
