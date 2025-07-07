@@ -172,4 +172,5 @@ cython_debug/
 
 
 data/
+analysis/
 credentials.json
